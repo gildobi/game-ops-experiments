@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issue Triage Assistant &middot; Game Operations Incident Structuring</title>
+<meta name="description" content="Turn an unstructured game or product issue into a structured triage plan. All analysis runs locally in the browser.">
+<style>
+.ita, .ita * { box-sizing: border-box; }
+.ita {
+  --bg: #F5F5F3;
+  --card: #FFFFFF;
+  --line: #E3E2DE;
+  --line-strong: #D2D1CC;
+  --ink: #1B1B19;
+  --ink-2: #4A4945;
+  --ink-3: #7A7973;
+  --accent: #DE6B10;
+  --accent-soft: #FCF3EA;
+  --accent-line: #F0CFAE;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+.ita-wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+/* top bar */
+.ita-bar {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(245,245,243,0.92);
+  backdrop-filter: saturate(140%) blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+.ita-bar-in { display: flex; align-items: center; gap: 12px; height: 52px; }
+.ita-brand { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }
+.ita-brand-sub { font-size: 12px; color: var(--ink-3); border-left: 1px solid var(--line-strong); padding-left: 12px; white-space: nowrap; }
+.ita-spacer { flex: 1; }
+.ita-engine {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  border: 1px solid var(--line); background: var(--card);
+  padding: 3px 8px; border-radius: 3px; white-space: nowrap;
+}
+
+/* type */
+.ita-eyebrow {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 10px;
+}
+.ita-h1 { font-size: 26px; line-height: 1.22; font-weight: 650; letter-spacing: -0.022em; margin: 0 0 10px; max-width: 640px; }
+.ita-lede { font-size: 14px; color: var(--ink-2); margin: 0; max-width: 640px; }
+
+/* cards + sections */
+.ita-card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+.ita-sec { margin-top: 20px; }
+.ita-sec-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.ita-sec-num { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.ita-sec-title { font-size: 15px; font-weight: 640; letter-spacing: -0.012em; margin: 0; }
+.ita-sec-note { font-size: 12px; color: var(--ink-3); margin: 0 0 10px; }
+.ita-pad { padding: 16px; }
+
+/* input */
+.ita-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.ita-ta {
+  width: 100%; min-height: 190px; resize: vertical;
+  font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink);
+  background: #FCFCFB; border: 1px solid var(--line-strong); border-radius: 4px; padding: 12px;
+}
+.ita-ta::placeholder { color: #A6A5A0; }
+.ita-ta:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ita-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.ita-count { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-left: auto; }
+
+.ita-btn {
+  font-family: var(--sans); font-size: 13px; font-weight: 550;
+  padding: 8px 14px; border-radius: 4px; border: 1px solid var(--line-strong);
+  background: var(--card); color: var(--ink); cursor: pointer;
+}
+.ita-btn:hover { background: #F7F7F5; }
+.ita-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ita-btn-primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+.ita-btn-primary:hover { background: #34332F; }
+.ita-btn-ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+.ita-btn-ghost:hover { background: #ECEBE7; }
+.ita-btn-sm { font-size: 12px; padding: 5px 10px; }
+.ita-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+.ita-samples { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.ita-sample {
+  text-align: left; cursor: pointer; padding: 10px 12px; border-radius: 4px;
+  border: 1px solid var(--line-strong); background: var(--card); color: var(--ink);
+  font-family: var(--sans); font-size: 13px;
+}
+.ita-sample:hover { border-color: var(--line-strong); background: #FAFAF8; }
+.ita-sample[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.ita-sample-k { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.ita-sample[aria-pressed="true"] .ita-sample-k { color: var(--accent); }
+.ita-sample:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ita-err { margin-top: 10px; font-size: 13px; color: #A03A0B; background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: 4px; padding: 8px 12px; }
+
+/* summary grid */
+.ita-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.ita-field { padding: 12px 16px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0; }
+.ita-field:nth-child(3n) { border-right: none; }
+.ita-field:nth-child(n+4) { border-bottom: none; }
+.ita-field-k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.ita-field-v { font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.ita-field-v.unk { font-weight: 450; color: var(--ink-3); font-style: normal; }
+.ita-field-note { font-family: var(--mono); font-size: 11px; color: var(--accent); margin-top: 3px; }
+.ita-issue-line { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+
+/* assessment */
+.ita-assess { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+.ita-sev {
+  font-family: var(--mono); font-size: 20px; font-weight: 600; letter-spacing: 0.02em;
+  border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent);
+  padding: 6px 14px; border-radius: 4px;
+}
+.ita-sev.low { border-color: var(--line-strong); background: #F5F5F3; color: var(--ink-2); }
+.ita-meta-k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.ita-meta-v { font-size: 14px; font-weight: 600; }
+.ita-assess-body { flex: 1; min-width: 260px; }
+.ita-callout { margin-top: 12px; border-left: 2px solid var(--accent); background: var(--accent-soft); padding: 8px 12px; font-size: 12px; color: var(--ink-2); border-radius: 0 3px 3px 0; }
+
+/* three columns */
+.ita-three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.ita-col-head { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.ita-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.ita-col-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+.ita-col-count { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-left: auto; }
+.ita-col-def { font-size: 11.5px; color: var(--ink-3); padding: 8px 14px 0; }
+.ita-ul { list-style: none; margin: 0; padding: 8px 14px 14px; }
+.ita-ul li { position: relative; padding-left: 14px; margin-top: 7px; font-size: 13px; color: var(--ink-2); }
+.ita-ul li::before { content: ""; position: absolute; left: 0; top: 8px; width: 5px; height: 1px; background: var(--line-strong); }
+.ita-ul.acc li::before { background: var(--accent); }
+
+/* numbered questions */
+.ita-ol { list-style: none; margin: 0; padding: 0; }
+.ita-ol li { display: flex; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.ita-ol li:last-child { border-bottom: none; }
+.ita-ol .n { font-family: var(--mono); font-size: 11px; color: var(--ink-3); padding-top: 2px; flex: none; }
+
+/* checklist */
+.ita-plan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.ita-check { display: flex; gap: 9px; align-items: flex-start; padding: 8px 14px; font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--line); cursor: pointer; }
+.ita-check:hover { background: #FAFAF8; }
+.ita-check input { margin: 3px 0 0; accent-color: var(--accent); flex: none; }
+.ita-check.done span { color: var(--ink-3); text-decoration: line-through; }
+
+/* teams */
+.ita-teams { display: grid; grid-template-columns: repeat(2, 1fr); }
+.ita-team { padding: 12px 16px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+.ita-team:nth-child(2n) { border-right: none; }
+.ita-team-n { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+.ita-team-r { font-size: 13px; color: var(--ink-2); }
+
+/* outputs */
+.ita-out-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #FBFBF9; border-radius: 4px 4px 0 0; }
+.ita-out-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.ita-pre {
+  margin: 0; padding: 14px 16px; font-family: var(--mono); font-size: 12px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink-2); max-height: 460px; overflow: auto;
+}
+
+/* footer */
+.ita-foot { margin: 32px 0 40px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); max-width: 760px; }
+.ita-foot p { margin: 0 0 6px; }
+
+.ita-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .ita-three, .ita-plan, .ita-samples { grid-template-columns: 1fr; }
+  .ita-grid { grid-template-columns: repeat(2, 1fr); }
+  .ita-field:nth-child(3n) { border-right: 1px solid var(--line); }
+  .ita-field:nth-child(n+4) { border-bottom: 1px solid var(--line); }
+  .ita-field:nth-child(2n) { border-right: none; }
+  .ita-field:nth-child(n+5) { border-bottom: none; }
+  .ita-teams { grid-template-columns: 1fr; }
+  .ita-team { border-right: none; }
+}
+@media (max-width: 560px) {
+  .ita-wrap { padding: 0 16px; }
+  .ita-grid { grid-template-columns: 1fr; }
+  .ita-field { border-right: none !important; border-bottom: 1px solid var(--line) !important; }
+  .ita-field:last-child { border-bottom: none !important; }
+  .ita-h1 { font-size: 21px; }
+  .ita-brand-sub { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .ita * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body class="ita">
+
+<header class="ita-bar">
+  <div class="ita-wrap ita-bar-in">
+    <span class="ita-brand">Issue Triage Assistant</span>
+    <span class="ita-brand-sub">Game Operations Incident Structuring</span>
+    <span class="ita-spacer"></span>
+    <span class="ita-engine" id="ita-engine-label">analysis engine &middot; local</span>
+  </div>
+</header>
+
+<main class="ita-wrap">
+
+  <div style="padding-top:28px">
+    <p class="ita-eyebrow">Incident intake</p>
+    <h1 class="ita-h1">Turn an unstructured product issue into an actionable triage plan.</h1>
+    <p class="ita-lede">
+      Describe what happened, what is currently known, and any available context. The tool will
+      structure the issue, identify information gaps, suggest investigation steps, and prepare
+      communication drafts.
+    </p>
+  </div>
+
+  <div class="ita-card ita-pad" style="margin-top:20px">
+    <label class="ita-label" for="ita-input">Describe the issue</label>
+    <textarea id="ita-input" class="ita-ta"
+      placeholder="Players in Thailand started reporting login failures after version 2.4.1 was released. So far it appears to affect Android users only. Customer Support reports increased significantly over the last two hours."></textarea>
+
+    <div class="ita-row">
+      <button class="ita-btn ita-btn-primary" id="ita-analyze">Analyze issue</button>
+      <button class="ita-btn" id="ita-load">Load sample issue</button>
+      <button class="ita-btn ita-btn-ghost" id="ita-reset">Reset</button>
+      <span class="ita-count" id="ita-count">0 chars</span>
+    </div>
+
+    <div class="ita-err" id="ita-error" role="alert" hidden></div>
+
+    <div class="ita-samples" id="ita-samples"></div>
+  </div>
+
+  <div id="ita-results" hidden></div>
+
+  <footer class="ita-foot">
+    <p>
+      Portfolio prototype &middot; Built to explore how AI-assisted structuring can support Game Operations
+      incident triage. All analysis runs locally in the browser.
+    </p>
+    <p>
+      Generated outputs are preliminary working drafts and should be validated against actual product
+      data, logs, and team incident procedures.
+    </p>
+  </footer>
+
+</main>
+
+<script>
+const UNKNOWN = "Unknown / Needs confirmation";
+
+/* ---------------------------------------------------------------- samples -- */
+
+const SAMPLES = [
+  {
+    id: "login",
+    name: "Login issue after release",
+    text: "Players in Thailand started reporting login failures after version 2.4.1 was released. So far it appears to affect Android users only. Customer Support reports increased significantly over the last two hours.",
+  },
+  {
+    id: "payment",
+    name: "Payment issue in one market",
+    text: "Players in Indonesia are reporting failed purchases on Android. The payment confirmation screen completes but some players say they do not receive the purchased currency. Reports started this morning. No iOS reports have been confirmed yet.",
+  },
+  {
+    id: "event",
+    name: "Event reward configuration issue",
+    text: "Several players reported receiving the wrong milestone reward from the Summer Festival event. Reports currently appear limited to players who reached milestone 15. The event configuration was updated yesterday.",
+  },
+];
+
+/* ------------------------------------------------------------ dictionaries -- */
+
+const PLATFORMS = [
+  { label: "Android", pats: [/\bandroid\b/i, /\bgoogle play\b/i, /\bplay store\b/i, /\bapk\b/i] },
+  { label: "iOS", pats: [/\bios\b/i, /\biphone\b/i, /\bipad\b/i, /\bapp store\b/i, /\btestflight\b/i] },
+  { label: "PC", pats: [/\bpc\b/i, /\bwindows\b/i, /\bsteam\b/i, /\bdesktop client\b/i] },
+  { label: "Web", pats: [/\bweb\s?(client|version|build)\b/i, /\bbrowser\b/i] },
+  { label: "Console", pats: [/\bconsole\b/i, /\bplaystation\b/i, /\bps5\b/i, /\bxbox\b/i, /\bnintendo switch\b/i] },
+];
+
+const MARKETS = [
+  "Thailand", "Indonesia", "Vietnam", "Philippines", "Malaysia", "Singapore",
+  "Japan", "South Korea", "Korea", "Taiwan", "Hong Kong", "India", "China",
+  "Brazil", "Mexico", "Argentina", "Turkey", "Russia", "Poland", "Germany",
+  "France", "Spain", "Italy", "Australia", "Canada", "Egypt", "Nigeria",
+  "Saudi Arabia", "United Arab Emirates", "United Kingdom", "United States",
+  "SEA", "LATAM", "EMEA", "APAC",
+];
+
+const ISSUE_TYPES = [
+  {
+    key: "login",
+    label: "Authentication / login",
+    short: "login",
+    pats: [/\blog\s?-?\s?in\b/i, /\blogins?\b/i, /\bsign\s?-?\s?in\b/i, /\bauthenticat\w*/i, /\baccount access\b/i, /\bsession expired\b/i],
+  },
+  {
+    key: "payment",
+    label: "Payments / in-app purchase",
+    short: "payment",
+    pats: [/\bpayments?\b/i, /\bpurchase\w*/i, /\bbilling\b/i, /\btransactions?\b/i, /\biap\b/i, /\bcheckout\b/i, /\bcurrency\b/i, /\brefunds?\b/i, /\btop\s?-?\s?up\b/i],
+  },
+  {
+    key: "progression",
+    label: "Progression / player data",
+    short: "progression",
+    pats: [/\bprogress\w*/i, /\bsave data\b/i, /\bdata loss\b/i, /\binventory\b/i, /\blost items?\b/i, /\brollback\b/i, /\bmissing items?\b/i],
+  },
+  {
+    key: "event",
+    label: "Live event / reward configuration",
+    short: "event reward",
+    pats: [/\bevents?\b/i, /\brewards?\b/i, /\bmilestones?\b/i, /\bquests?\b/i, /\bbattle pass\b/i, /\bconfigurations?\b/i, /\bconfig\b/i, /\bfestival\b/i],
+  },
+  {
+    key: "crash",
+    label: "Stability / crash",
+    short: "stability",
+    pats: [/\bcrash\w*/i, /\bfreez\w*/i, /\bblack screen\b/i, /\banr\b/i, /\bforce clos\w*/i],
+  },
+  {
+    key: "network",
+    label: "Network / matchmaking",
+    short: "connectivity",
+    pats: [/\bmatchmaking\b/i, /\bdisconnect\w*/i, /\bping\b/i, /\btimeouts?\b/i, /\blobby\b/i, /\bunable to connect\b/i],
+  },
+  {
+    key: "performance",
+    label: "Client performance",
+    short: "performance",
+    pats: [/\blag(gy|ging)?\b/i, /\bfps\b/i, /\bframe rate\b/i, /\blatency\b/i, /\bloading times?\b/i, /\bslow\b/i],
+  },
+  {
+    key: "cosmetic",
+    label: "UI / cosmetic",
+    short: "UI",
+    pats: [/\bcosmetic\b/i, /\btypos?\b/i, /\bvisual glitch\b/i, /\bmisaligned\b/i, /\bwrong (image|icon|text|label)\b/i, /\bui bug\b/i],
+  },
+];
+
+const REPORT_VERBS = /\b(report\w*|observ\w*|start\w*|began|begun|begin\w*|notic\w*|seeing|saw|complain\w*|spike\w*|increas\w*)\b/i;
+
+const TIME_PATS = [
+  /\b(?:in|over|within|during|for)\s+the\s+(?:last|past)\s+([\w-]+)\s+(minutes?|hours?|days?|weeks?)\b/i,
+  /\b(this morning|this afternoon|this evening|tonight|today|yesterday|last night|overnight)\b/i,
+  /\b(?:since|starting|from)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
+  /\b(?:since|starting|from)\s+(\d{4}-\d{2}-\d{2})\b/i,
+];
+
+/* ----------------------------------------------------------------- helpers -- */
+
+// Periods inside version numbers (2.4.1) and decimals must not end a sentence,
+// so they are masked before splitting and restored afterwards.
+const sentences = (t) => {
+  const guarded = t.replace(/(\d)\.(?=\d)/g, "$1\u0001");
+  return (guarded.match(/[^.!?\n]+[.!?\n]*/g) || [])
+    .map((s) => s.replace(/\u0001/g, ".").trim())
+    .filter(Boolean);
+};
+const uniq = (a) => Array.from(new Set(a));
+const list = (a, fallback) => (a.length ? a.join(", ") : fallback);
+
+function firstMatchWord(text, pats) {
+  for (const p of pats) {
+    const m = text.match(p);
+    if (m) return m[0];
+  }
+  return null;
+}
+
+/* ---------------------------------------------------------------- detectors */
+
+/* Negation patterns that specifically deny a report, not just any "not" in the
+   sentence. "Android users are not able to log in" must NOT read as a denial. */
+const NEG_PATS = [
+  /\bno\s+[\w\s]{0,20}?(reports?|issues?|complaints?|cases?|tickets?)\b/i,
+  /\bnot\s+(?:been\s+)?(affected|impacted|confirmed|reported|reproduced|reproducible)\b/i,
+  /\bunaffected\b/i,
+  /\bnone\s+(reported|confirmed|affected)\b/i,
+];
+
+function isDenied(sentence, platform, platformsInSentence) {
+  const hit = firstMatchWord(sentence, platform.pats);
+  if (!hit) return false;
+  const at = sentence.toLowerCase().indexOf(hit.toLowerCase());
+  for (const n of NEG_PATS) {
+    const m = sentence.match(n);
+    if (!m) continue;
+    const start = m.index;
+    const end = start + m[0].length;
+    // Platform named inside the denial itself, e.g. "No iOS reports ...".
+    if (at >= start && at < end) return true;
+    // Or the denial is unambiguous because only this platform is in the sentence.
+    if (platformsInSentence === 1) return true;
+  }
+  return false;
+}
+
+function detectPlatforms(text) {
+  const sents = sentences(text);
+  const affected = [];
+  const denied = [];
+  for (const p of PLATFORMS) {
+    const hits = sents.filter((s) => p.pats.some((r) => r.test(s)));
+    if (!hits.length) continue;
+    const allDenied = hits.every((s) => {
+      const count = PLATFORMS.filter((q) => q.pats.some((r) => r.test(s))).length;
+      return isDenied(s, p, count);
+    });
+    (allDenied ? denied : affected).push(p.label);
+  }
+  return { platforms: affected, denied };
+}
+
+function detectMarkets(text) {
+  const found = MARKETS.filter((m) => new RegExp(`\\b${m}\\b`, "i").test(text));
+  const global = /\b(global(ly)?|worldwide|all markets|all regions|every region)\b/i.test(text);
+  // Collapse Korea/South Korea duplicates.
+  const cleaned = found.filter((m) => !(m === "Korea" && found.includes("South Korea")));
+  return { markets: uniq(cleaned), global };
+}
+
+function detectVersion(text) {
+  const labelled = text.match(/\b(?:v|version|build|client)\s*\.?\s*(\d+\.\d+(?:\.\d+)*)\b/i);
+  if (labelled) return labelled[1];
+  const bare = text.match(/\b(\d+\.\d+(?:\.\d+)+)\b/);
+  return bare ? bare[1] : null;
+}
+
+function detectType(text) {
+  let best = null;
+  let bestScore = 0;
+  for (const t of ISSUE_TYPES) {
+    const score = t.pats.reduce((n, r) => n + (r.test(text) ? 1 : 0), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = t;
+    }
+  }
+  return best;
+}
+
+function detectPopulation(text) {
+  const pct = text.match(/\b(\d{1,3}(?:\.\d+)?)\s*%/);
+  if (pct) return { kind: "quantified", value: `${pct[1]}% of players (as stated)`, phrase: pct[0] };
+
+  const count = text.match(/\b(\d[\d,]{1,9})\s+(players|users|accounts|tickets|reports|transactions)\b/i);
+  if (count) return { kind: "quantified", value: `${count[1]} ${count[2].toLowerCase()} (as stated)`, phrase: count[0] };
+
+  const broad = text.match(/\b(all|every|most)\s+(players?|users?)\b/i) || text.match(/\bwidespread\b/i);
+  if (broad) return { kind: "broad", value: null, phrase: broad[0] };
+
+  const partial = text.match(/\b(some|several|a few|a handful of|multiple|isolated)\s+(players|users|reports|accounts)\b/i);
+  if (partial) return { kind: "partial", value: null, phrase: partial[0] };
+
+  return { kind: "none", value: null, phrase: null };
+}
+
+function detectFirstObserved(text) {
+  for (const s of sentences(text)) {
+    if (!REPORT_VERBS.test(s)) continue;
+    for (const p of TIME_PATS) {
+      const m = s.match(p);
+      if (m) return m[0].replace(/\s+/g, " ").trim();
+    }
+  }
+  return null;
+}
+
+function detectSignals(text) {
+  return {
+    releaseLinked: /\b(after|following|since|post)\b[^.]{0,60}\b(release|released|rollout|roll\s?out|update|updated|patch|launch|version|build|deploy\w*)\b/i.test(text),
+    configChanged: /\b(config\w*|settings?|event|parameters?)\b[^.]{0,60}\b(updated|changed|modified|adjusted|pushed)\b/i.test(text),
+    supportVolume: /\b(customer support|support|cs)\b[^.]{0,60}\b(report\w*|ticket\w*|contact\w*|volume|increas\w*|spike\w*)\b/i.test(text)
+      || /\b(ticket volume|contact rate)\b/i.test(text),
+    outage: /\b(outage|service unavailable|servers? (are )?down|completely down|total(ly)? unavailable|no ?one can (play|connect|log)|(cannot|can't|unable to|not able to) (play|connect|log ?in|sign ?in)[^.]{0,20}\bat all\b)/i.test(text),
+    workaround: /\b(workaround|work around|retry(ing)? works|resolves after|fixed by restarting|clearing cache)\b/i.test(text),
+    onlyPhrase: text.match(/\b(?:appears? to |seems? to |is )?(?:affect|impact)\w*\s+([\w\s]{1,30}?)\s+(?:users|players)?\s*only\b/i),
+    limitedPhrase: text.match(/\blimited to\s+([^.,;]{3,80})/i),
+    negativeReport: text.match(/\bno\s+([\w\s]{1,20}?)\s+reports?\b[^.]{0,40}/i),
+    moneyImpact: /\b(revenue|charged|chargeback|refund)\b/i.test(text),
+  };
+}
+
+/* ------------------------------------------------------------------ facts -- */
+
+function buildConfirmed(text, f) {
+  const out = [];
+  if (f.platforms.length) out.push(`${list(f.platforms)} named explicitly as the affected platform${f.platforms.length > 1 ? "s" : ""}.`);
+  if (f.markets.length) out.push(`${list(f.markets)} named explicitly as the reporting market${f.markets.length > 1 ? "s" : ""}.`);
+  if (f.global) out.push(`Description refers to a global or all-market scope.`);
+  if (f.version) out.push(`Version ${f.version} referenced in the description.`);
+  if (f.type) {
+    const w = firstMatchWord(text, f.type.pats);
+    out.push(`Reported behaviour is described in terms of "${w}".`);
+  }
+  if (f.firstObserved) out.push(`Reports described as occurring ${f.firstObserved}.`);
+  if (f.population.phrase) out.push(`Affected population described as "${f.population.phrase}".`);
+  if (f.signals.releaseLinked) out.push(`Reports described as appearing after a release, rollout or update.`);
+  if (f.signals.configChanged) out.push(`A configuration or settings change is described as having occurred.`);
+  if (f.signals.supportVolume) out.push(`A change in Customer Support contact volume is described.`);
+  if (f.signals.onlyPhrase) out.push(`Description states the issue appears to affect ${f.signals.onlyPhrase[1].trim()} only.`);
+  if (f.signals.limitedPhrase) out.push(`Description states reports appear limited to ${f.signals.limitedPhrase[1].trim()}.`);
+  if (f.deniedPlatforms.length)
+    out.push(`Description states ${list(f.deniedPlatforms)} ${f.deniedPlatforms.length > 1 ? "have" : "has"} not been confirmed as affected.`);
+  else if (f.signals.negativeReport)
+    out.push(`Description states: "${f.signals.negativeReport[0].trim().replace(/\.$/, "")}".`);
+  if (f.signals.outage) out.push(`Description uses outage-level language for service availability.`);
+  if (f.signals.workaround) out.push(`A workaround or partial recovery behaviour is described.`);
+  if (!out.length) out.push(`No specific platform, market, version or timing was stated in the description.`);
+  return out;
+}
+
+function buildInferred(f) {
+  const out = [];
+  if (f.signals.releaseLinked && f.version)
+    out.push(`The described timing may indicate a relationship with the ${f.version} release — worth checking against the rollout timeline.`);
+  else if (f.signals.releaseLinked)
+    out.push(`The described timing may indicate a relationship with a recent release — the exact build is not stated.`);
+  if (f.platforms.length === 1)
+    out.push(`The issue could be specific to ${f.platforms[0]}, though the description does not confirm other platforms are unaffected.`);
+  if (f.markets.length === 1)
+    out.push(`${f.markets[0]} may be the first market to report rather than the only market affected.`);
+  if (f.signals.supportVolume)
+    out.push(`The described change in Customer Support contacts could indicate an ongoing rather than isolated issue.`);
+  if (f.type && f.type.key === "payment")
+    out.push(`A gap between payment confirmation and item delivery could be related to purchase validation or fulfilment — worth checking.`);
+  if (f.type && f.type.key === "event" && f.signals.configChanged)
+    out.push(`The described configuration change could be related to the reward behaviour — worth checking against the change record.`);
+  if (f.signals.limitedPhrase)
+    out.push(`The reported pattern may indicate a condition specific to the stated segment, based on the supplied description.`);
+  if (f.population.kind === "broad")
+    out.push(`The language used may indicate broad impact, though no measured figure was supplied.`);
+  if (!out.length)
+    out.push(`The supplied description does not contain enough signal to support a reasonable inference yet.`);
+  return out;
+}
+
+function buildUnknown(f) {
+  const out = ["Actual root cause"];
+  if (f.population.kind !== "quantified") out.push("Percentage or number of affected players");
+  if (!f.markets.length && !f.global) out.push("Which markets are affected");
+  else if (f.markets.length === 1) out.push("Whether markets other than " + f.markets[0] + " are affected");
+  if (!f.platforms.length) out.push("Which platforms are affected");
+  else if (f.platforms.length === 1) out.push("Whether platforms other than " + f.platforms[0] + " are affected");
+  if (f.deniedPlatforms.length)
+    out.push(`Whether ${list(f.deniedPlatforms)} is genuinely unaffected or simply has no reports yet`);
+  if (f.version) out.push(`Whether the issue reproduces on the client version before ${f.version}`);
+  else out.push("Which client version or build is affected");
+  if (!f.firstObserved) out.push("When the issue was first observed");
+  out.push("Whether the issue is currently ongoing");
+  out.push("Exact error message or error code seen by players");
+  if (f.type && f.type.key === "payment") {
+    out.push("Whether affected players were charged");
+    out.push("Number of transactions involved");
+  }
+  if (f.type && f.type.key === "login") out.push("Whether failures are client-side or server-side");
+  if (f.type && f.type.key === "event") {
+    out.push("Which configuration values were changed and by whom");
+    out.push("Whether affected players received an incorrect reward or none at all");
+  }
+  return uniq(out);
+}
+
+/* --------------------------------------------------------------- severity -- */
+
+const CORE_TYPES = ["login", "payment", "network", "progression", "crash"];
+
+function assess(f) {
+  const core = f.type ? CORE_TYPES.includes(f.type.key) : false;
+  const broad = f.population.kind === "broad" || f.signals.outage;
+  const wideMarket = f.global || f.markets.length > 1;
+  const narrow = f.population.kind === "partial" || !!f.signals.limitedPhrase || f.signals.workaround;
+
+  let severity, explanation;
+
+  if (core && broad && (wideMarket || !f.markets.length)) {
+    severity = "P0";
+    explanation = `The description uses broad, service-level language for ${f.type.short} across ${wideMarket ? "multiple markets or a global scope" : "an unstated market scope"}. Based on the supplied description this may indicate a widespread availability problem, so it is raised at the highest preliminary level until scope is measured.`;
+  } else if (core && (broad || wideMarket)) {
+    severity = "P1";
+    explanation = `Core ${f.type.short} functionality appears affected and the described scope is broad, but the total affected population has not been confirmed.`;
+  } else if (core) {
+    severity = "P1";
+    const where = [
+      f.platforms.length ? `the ${list(f.platforms)} platform${f.platforms.length > 1 ? "s" : ""}` : null,
+      f.markets.length ? `the ${list(f.markets)} market${f.markets.length > 1 ? "s" : ""}` : null,
+    ].filter(Boolean).join(" and ");
+    explanation = `Core ${f.type.short} functionality appears affected${where ? ` for ${where}` : ""}, but the total affected population has not yet been confirmed.`;
+  } else if (f.type && f.type.key === "cosmetic") {
+    severity = "P3";
+    explanation = `The described behaviour reads as presentational rather than blocking, with no stated impact on progression, access or spend.`;
+  } else if (narrow || (f.type && !core)) {
+    severity = "P2";
+    explanation = `The description points to a partial or segment-limited problem in ${f.type ? f.type.short : "an unclassified area"} rather than a blocking failure of a core system. Scope has not been measured, so this could change.`;
+  } else {
+    severity = "P2";
+    explanation = `The description does not identify a core system failure or a measured scope. This is a placeholder level pending more information.`;
+  }
+
+  const knownFields = [
+    f.platforms.length > 0,
+    f.markets.length > 0 || f.global,
+    !!f.version,
+    !!f.firstObserved,
+    f.population.kind === "quantified",
+    !!f.type,
+  ].filter(Boolean).length;
+
+  let confidence;
+  if (knownFields >= 5 && f.population.kind === "quantified") confidence = "High";
+  else if (knownFields >= 3) confidence = "Medium";
+  else confidence = "Low";
+
+  return { severity, confidence, explanation };
+}
+
+/* -------------------------------------------------------------- questions -- */
+
+function buildQuestions(f) {
+  const q = [];
+  const t = f.type ? f.type.key : null;
+
+  // scope
+  if (f.population.kind !== "quantified")
+    q.push(`What percentage of ${f.platforms.length ? f.platforms[0] + " " : ""}players is affected?`);
+  if (f.markets.length === 1)
+    q.push(`Is the issue limited to ${f.markets[0]}, or was it simply reported there first?`);
+  else if (!f.markets.length && !f.global)
+    q.push(`Which markets have reported the issue so far?`);
+  if (f.deniedPlatforms.length)
+    q.push(`Has ${list(f.deniedPlatforms)} been tested and verified as unaffected, or has it simply not been reported yet?`);
+  else if (f.platforms.length === 1)
+    q.push(`Has the issue been checked on platforms other than ${f.platforms[0]}?`);
+
+  // reproducibility
+  if (f.version) q.push(`Does the issue reproduce on the client version before ${f.version}?`);
+  else q.push(`Which client versions have reproduced the issue?`);
+  q.push(`Is the issue still ongoing, or have reports stopped?`);
+
+  // recent changes
+  if (f.signals.releaseLinked)
+    q.push(`Were any server-side or SDK configurations changed during the same release window?`);
+  if (f.signals.configChanged)
+    q.push(`What exactly changed in the configuration, and when was it applied?`);
+  if (f.version) q.push(`What is the current rollout percentage for ${f.version}?`);
+
+  // type-specific
+  if (t === "login") {
+    q.push(`Are specific device or OS versions over-represented in the failures?`);
+    q.push(`What error is returned by the authentication service for affected attempts?`);
+  }
+  if (t === "payment") {
+    q.push(`Were affected players charged for the transactions in question?`);
+    q.push(`Does the store receipt validation log show successful or failed callbacks?`);
+  }
+  if (t === "event") {
+    q.push(`Which reward values were configured before and after the change?`);
+    q.push(`Does the issue affect only the stated milestone, or other milestones as well?`);
+  }
+  if (t === "crash" || t === "performance") {
+    q.push(`Which device models appear most frequently in the reports?`);
+  }
+
+  // ownership
+  q.push(`Who is the current on-call owner for the affected system?`);
+
+  return uniq(q).slice(0, 7);
+}
+
+/* ------------------------------------------------------------------- plan -- */
+
+function buildPlan(f) {
+  const t = f.type ? f.type.key : null;
+
+  const immediate = [
+    "Confirm whether the issue is still ongoing",
+    "Check error-rate and failure-rate changes against the previous baseline",
+    "Validate whether the affected date and time window is complete",
+    f.markets.length ? `Check whether reports exist outside ${list(f.markets)}` : "Check which markets reports are arriving from",
+    "Confirm whether an existing incident already covers this behaviour",
+  ];
+
+  const technical = [
+    f.version ? `Compare behaviour on ${f.version} against the previous version` : "Compare affected and unaffected client versions",
+    "Review recent SDK and client changes in the release window",
+    "Check server logs for elevated error responses",
+    f.version ? `Verify the rollout percentage for ${f.version}` : "Verify current rollout state",
+  ];
+  if (t === "login") technical.push("Review authentication service error breakdown by response code");
+  if (t === "payment") technical.push("Review purchase validation and fulfilment callbacks for affected transactions");
+  if (t === "event") technical.push("Diff the live event configuration against the previous revision");
+  if (t === "crash" || t === "performance") technical.push("Review crash and ANR clusters by device model and OS version");
+  if (f.platforms.length === 1) technical.push(`Attempt reproduction on ${f.platforms[0]} using a build matching player conditions`);
+
+  const operations = [
+    "Review the release timeline against the first reported occurrence",
+    "Check market-specific settings and entitlements",
+    "Review Customer Support ticket volume and ticket contents",
+    "Check the live configuration change log for the relevant period",
+  ];
+  if (f.markets.length) operations.push(`Confirm with the publishing contact for ${list(f.markets)} whether anything changed locally`);
+  if (t === "payment") operations.push("Check for payment provider or store status notices in the affected market");
+  if (t === "event") operations.push("Confirm which player segment the event configuration was intended to target");
+
+  return { immediate, technical, operations };
+}
+
+/* ------------------------------------------------------------------ teams -- */
+
+function buildTeams(f) {
+  const t = f.type ? f.type.key : null;
+  const teams = [];
+  const add = (name, reason) => { if (!teams.some((x) => x.name === name)) teams.push({ name, reason }); };
+
+  if (f.platforms.length)
+    add("Client", `${list(f.platforms)} behaviour is described as changing within the reported window, so client-side reproduction may be required.`);
+  if (t === "login" || t === "network" || t === "progression")
+    add("Server", `The described behaviour involves a server-dependent system, so service-side error data is worth reviewing.`);
+  if (f.signals.releaseLinked || f.version)
+    add("SDK", `A release is referenced in the description, so SDK-level changes in that window are worth checking.`);
+  if (t === "payment") {
+    add("Payments", `Purchase or fulfilment behaviour is described, so transaction and validation data is worth reviewing.`);
+    add("Server", `Purchase fulfilment depends on server-side validation, so backend records are worth reviewing.`);
+  }
+  if (t === "event") {
+    add("Live Ops", `A live event configuration is referenced, so the change history for that configuration is worth reviewing.`);
+    add("Product", `Intended reward values need confirmation against the design specification.`);
+  }
+  if (f.version || f.signals.releaseLinked)
+    add("QA", `Reproduction across versions and devices has not been established in the description.`);
+  if (f.markets.length || f.global)
+    add("Publishing", `Market-specific conditions are referenced, so local settings and partner status are worth checking.`);
+  if (f.signals.supportVolume)
+    add("Customer Support", `Contact volume is referenced in the description and ticket contents may add scope detail.`);
+  add("Data", `Scope and affected population are not quantified in the description, so measurement is required.`);
+
+  if (f.platforms.length && !f.version)
+    add("QA", `No client version is stated, so reproduction conditions still need to be established.`);
+  if (!f.platforms.length && !f.version && teams.length < 4)
+    add("QA", `Basic reproduction conditions have not been established in the description.`);
+
+  return teams;
+}
+
+/* --------------------------------------------------------------- renderers -- */
+
+function buildStakeholder(f, summary, assessment, facts, plan, teams) {
+  const short = f.type ? f.type.short : null;
+  const label = [
+    f.platforms.length ? list(f.platforms) : null,
+    short ? `${short} issue` : "Reported issue",
+    f.markets.length ? `— ${list(f.markets)}` : f.global ? "— multiple markets" : null,
+  ].filter(Boolean).join(" ");
+  const headline = label.charAt(0).toUpperCase() + label.slice(1);
+  const bullets = (arr) => arr.map((x) => `• ${x}`).join("\n");
+
+  const scopeLines = [
+    `Platform: ${summary.platform}`,
+    `Market: ${summary.market}`,
+    `Version: ${summary.version}`,
+    `Affected users: ${summary.affectedUsers}`,
+    `First observed: ${summary.firstObserved}`,
+  ];
+
+  return [
+    `[Investigating] ${headline}`,
+    "",
+    `We are investigating ${short ? `${short} problems` : "an issue"} reported by players${f.platforms.length ? ` on ${list(f.platforms)}` : ""}${f.markets.length ? ` in ${list(f.markets)}` : ""}${f.signals.releaseLinked && f.version ? ` following the ${f.version} rollout` : ""}. Scope and cause are not yet confirmed.`,
+    "",
+    `Current known scope:`,
+    bullets(scopeLines),
+    "",
+    `What we know:`,
+    bullets(facts.confirmed.slice(0, 5)),
+    "",
+    `What is being checked:`,
+    bullets([...plan.immediate.slice(0, 3), ...plan.technical.slice(0, 2)]),
+    "",
+    `Teams involved:`,
+    bullets(teams.map((t) => `${t.name}`)),
+    "",
+    `Next update:`,
+    `Pending further investigation. Severity is currently a preliminary ${assessment.severity} recommendation and has not been confirmed against incident criteria.`,
+  ].join("\n");
+}
+
+/* -------------------------------------------------------------- the engine -- */
+
+const localEngine = {
+  id: "local",
+  label: "analysis engine · local",
+  analyze(text) {
+    const t = text.trim();
+    const { markets, global } = detectMarkets(t);
+    const { platforms, denied } = detectPlatforms(t);
+    const f = {
+      platforms,
+      deniedPlatforms: denied,
+      markets,
+      global,
+      version: detectVersion(t),
+      type: detectType(t),
+      population: detectPopulation(t),
+      firstObserved: detectFirstObserved(t),
+      signals: detectSignals(t),
+    };
+
+    const marketValue = f.markets.length ? list(f.markets) : f.global ? "Global / multiple markets (as stated)" : UNKNOWN;
+
+    const issueLabel = [
+      f.type ? f.type.label : "Unclassified issue",
+      f.platforms.length || f.markets.length
+        ? `— ${[f.platforms.length ? list(f.platforms) : null, f.markets.length ? list(f.markets) : null].filter(Boolean).join(", ")}`
+        : "",
+    ].join(" ").trim();
+
+
+    const summary = {
+      issue: issueLabel,
+      platform: f.platforms.length ? list(f.platforms) : UNKNOWN,
+      market: marketValue,
+      version: f.version ? f.version : UNKNOWN,
+      firstObserved: f.firstObserved ? `Described as ${f.firstObserved}` : UNKNOWN,
+      affectedUsers: f.population.kind === "quantified" ? f.population.value : UNKNOWN,
+      affectedUsersNote: f.population.kind !== "quantified" && f.population.phrase ? `stated as "${f.population.phrase}"` : null,
+      feature: f.type ? f.type.label : UNKNOWN,
+    };
+
+    const assessment = assess(f);
+    const facts = {
+      confirmed: buildConfirmed(t, f),
+      inferred: buildInferred(f),
+      unknown: buildUnknown(f),
+    };
+    const questions = buildQuestions(f);
+    const plan = buildPlan(f);
+    const teams = buildTeams(f);
+
+    return {
+      summary,
+      assessment,
+      facts,
+      questions,
+      plan,
+      teams,
+      stakeholder: buildStakeholder(f, summary, assessment, facts, plan, teams),
+    };
+  },
+};
+</script>
+
+<script>
+/* =============================================================== UI LAYER ===
+   Vanilla rendering layer. It consumes only the TriageReport shape returned by
+   ENGINE.analyze(), so replacing the engine with an LLM adapter requires no
+   changes below this line.
+   ========================================================================== */
+
+const ENGINE = localEngine;
+
+const $ = (sel, root) => (root || document).querySelector(sel);
+const esc = (s) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+const el = {
+  input: null,
+  error: null,
+  count: null,
+  results: null,
+  samples: null,
+};
+
+let selectedSample = null;
+
+/* ------------------------------------------------------------- clipboard -- */
+
+function copyFallback(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.top = "-1000px";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch (e) {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return copyFallback(text);
+  } catch (e) {
+    return copyFallback(text);
+  }
+}
+
+function wireCopyButtons(root) {
+  root.querySelectorAll("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const source = root.querySelector(btn.getAttribute("data-copy"));
+      if (!source) return;
+      const ok = await copyText(source.textContent);
+      if (!ok) return;
+      const label = btn.getAttribute("data-label");
+      btn.textContent = "Copied";
+      clearTimeout(btn._t);
+      btn._t = setTimeout(() => {
+        btn.textContent = label;
+      }, 1500);
+    });
+  });
+}
+
+/* ---------------------------------------------------------- markup pieces -- */
+
+function section(n, title, note, body) {
+  return `
+    <section class="ita-sec">
+      <div class="ita-sec-head">
+        <span class="ita-sec-num">${n}</span>
+        <h2 class="ita-sec-title">${esc(title)}</h2>
+      </div>
+      ${note ? `<p class="ita-sec-note">${esc(note)}</p>` : ""}
+      ${body}
+    </section>`;
+}
+
+function field(k, v, note) {
+  const unknown = v === UNKNOWN;
+  return `
+    <div class="ita-field">
+      <div class="ita-field-k">${esc(k)}</div>
+      <div class="ita-field-v${unknown ? " unk" : ""}">${esc(v)}</div>
+      ${note ? `<div class="ita-field-note">${esc(note)}</div>` : ""}
+    </div>`;
+}
+
+function factColumn(title, dot, definition, items, accent) {
+  return `
+    <div class="ita-card">
+      <div class="ita-col-head">
+        <span class="ita-dot" style="background:${dot}"></span>
+        <span class="ita-col-title">${esc(title)}</span>
+        <span class="ita-col-count">${items.length}</span>
+      </div>
+      <p class="ita-col-def">${esc(definition)}</p>
+      <ul class="ita-ul${accent ? " acc" : ""}">
+        ${items.map((x) => `<li>${esc(x)}</li>`).join("")}
+      </ul>
+    </div>`;
+}
+
+function checklist(title, items, key) {
+  return `
+    <div class="ita-card">
+      <div class="ita-col-head">
+        <span class="ita-col-title">${esc(title)}</span>
+        <span class="ita-col-count">${items.length}</span>
+      </div>
+      ${items
+        .map(
+          (item, i) => `
+        <label class="ita-check" data-check>
+          <input type="checkbox" id="${key}-${i}">
+          <span>${esc(item)}</span>
+        </label>`
+        )
+        .join("")}
+    </div>`;
+}
+
+function outputBlock(title, body, copyLabel, id) {
+  return `
+    <div class="ita-card">
+      <div class="ita-out-head">
+        <span class="ita-out-title">${esc(title)}</span>
+        <button class="ita-btn ita-btn-sm" style="margin-left:auto"
+                data-copy="#${id}" data-label="${esc(copyLabel)}" aria-live="polite">${esc(copyLabel)}</button>
+      </div>
+      <pre class="ita-pre" id="${id}">${esc(body)}</pre>
+    </div>`;
+}
+
+/* ------------------------------------------------------------- render all -- */
+
+function render(report) {
+  const s = report.summary;
+  const a = report.assessment;
+  const sevLow = a.severity === "P2" || a.severity === "P3";
+
+  const summaryCard = `
+    <div class="ita-card">
+      <div class="ita-issue-line">
+        <span class="ita-field-k" style="margin-bottom:0">Issue</span>
+        <strong style="font-size:14px;font-weight:600">${esc(s.issue)}</strong>
+      </div>
+      <div class="ita-grid">
+        ${field("Platform", s.platform)}
+        ${field("Market", s.market)}
+        ${field("Version", s.version)}
+        ${field("First observed", s.firstObserved)}
+        ${field("Affected users", s.affectedUsers, s.affectedUsersNote)}
+        ${field("Feature / system", s.feature)}
+      </div>
+    </div>`;
+
+  const assessCard = `
+    <div class="ita-card ita-pad">
+      <div class="ita-assess">
+        <div>
+          <div class="ita-meta-k">Severity recommendation</div>
+          <div class="ita-sev${sevLow ? " low" : ""}">${esc(a.severity)}</div>
+        </div>
+        <div>
+          <div class="ita-meta-k">Confidence</div>
+          <div class="ita-meta-v">${esc(a.confidence)}</div>
+        </div>
+        <div class="ita-assess-body">
+          <div class="ita-meta-k">Reasoning</div>
+          <p style="margin:0;font-size:13px;color:var(--ink-2)">${esc(a.explanation)}</p>
+        </div>
+      </div>
+      <div class="ita-callout">
+        Preliminary assessment only &mdash; severity should be confirmed using the team's actual
+        incident criteria. This is a recommendation, not an authoritative incident classification.
+      </div>
+    </div>`;
+
+  const factsPanel = `
+    <div class="ita-three">
+      ${factColumn("Confirmed", "var(--ink)", "Stated explicitly in the description.", report.facts.confirmed, false)}
+      ${factColumn("Inferred", "var(--accent)", "Interpretations supported by the description \u2014 not verified.", report.facts.inferred, true)}
+      ${factColumn("Unknown", "var(--line-strong)", "Important information that was not supplied.", report.facts.unknown, false)}
+    </div>`;
+
+  const questionsCard = `
+    <div class="ita-card">
+      <ol class="ita-ol">
+        ${report.questions
+          .map(
+            (q, i) => `<li><span class="n">${String(i + 1).padStart(2, "0")}</span><span>${esc(q)}</span></li>`
+          )
+          .join("")}
+      </ol>
+    </div>`;
+
+  const planPanel = `
+    <div class="ita-plan">
+      ${checklist("Immediate checks", report.plan.immediate, "imm")}
+      ${checklist("Technical checks", report.plan.technical, "tec")}
+      ${checklist("Product / operations checks", report.plan.operations, "ops")}
+    </div>`;
+
+  const teamsCard = `
+    <div class="ita-card">
+      <div class="ita-teams">
+        ${report.teams
+          .map(
+            (t) => `
+          <div class="ita-team">
+            <div class="ita-team-n">${esc(t.name)}</div>
+            <div class="ita-team-r">${esc(t.reason)}</div>
+          </div>`
+          )
+          .join("")}
+      </div>
+    </div>`;
+
+  el.results.innerHTML = [
+    section("01", "Incident Summary", null, summaryCard),
+    section("02", "Initial Assessment", null, assessCard),
+    section(
+      "03",
+      "Confirmed / Inferred / Unknown",
+      "Nothing moves left. Inferred and unknown items stay where they are until someone confirms them with data.",
+      factsPanel
+    ),
+    section(
+      "04",
+      "Questions to Confirm",
+      "Ordered by what most changes the picture: scope, then reproducibility, then recent changes and ownership.",
+      questionsCard
+    ),
+    section("05", "Investigation Plan", "Checks to run, not causes. None of these items indicates a root cause.", planPanel),
+    section(
+      "06",
+      "Suggested Teams",
+      "Suggested because they hold information the description is missing \u2014 not because they are responsible for the issue.",
+      teamsCard
+    ),
+    section(
+      "07",
+      "Stakeholder Update",
+      "Written for Slack or internal email while the investigation is still open.",
+      outputBlock("Update draft", report.stakeholder, "Copy update", "out-update")
+    ),
+  ].join("");
+
+  wireCopyButtons(el.results);
+
+  el.results.querySelectorAll("[data-check] input").forEach((box) => {
+    box.addEventListener("change", () => {
+      box.closest("[data-check]").classList.toggle("done", box.checked);
+    });
+  });
+}
+
+/* --------------------------------------------------------------- controls -- */
+
+function setCount() {
+  el.count.textContent = el.input.value.trim().length + " chars";
+}
+
+function clearError() {
+  el.error.hidden = true;
+  el.error.textContent = "";
+}
+
+function markSample(id) {
+  selectedSample = id;
+  el.samples.querySelectorAll("button").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.id === id));
+  });
+}
+
+function pickSample(sample) {
+  el.input.value = sample.text;
+  markSample(sample.id);
+  setCount();
+  clearError();
+}
+
+function analyze() {
+  const text = el.input.value;
+  if (text.trim().length < 20) {
+    el.error.textContent = "Add at least a sentence describing what happened before analyzing.";
+    el.error.hidden = false;
+    el.input.focus();
+    return;
+  }
+  clearError();
+  render(ENGINE.analyze(text));
+  el.results.hidden = false;
+  const first = el.results.querySelector(".ita-sec");
+  if (first && typeof first.scrollIntoView === "function") {
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    first.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  }
+}
+
+function reset() {
+  el.input.value = "";
+  markSample(null);
+  setCount();
+  clearError();
+  el.results.hidden = true;
+  el.results.innerHTML = "";
+  el.input.focus();
+}
+
+/* ------------------------------------------------------------------ init -- */
+
+function init() {
+  el.input = $("#ita-input");
+  el.error = $("#ita-error");
+  el.count = $("#ita-count");
+  el.results = $("#ita-results");
+  el.samples = $("#ita-samples");
+
+  $("#ita-engine-label").textContent = ENGINE.label;
+
+  el.samples.innerHTML = SAMPLES.map(
+    (s, i) => `
+      <button class="ita-sample" data-id="${s.id}" aria-pressed="false">
+        <span class="ita-sample-k">Sample ${i + 1}</span>${esc(s.name)}
+      </button>`
+  ).join("");
+
+  el.samples.querySelectorAll("button").forEach((b) => {
+    b.addEventListener("click", () => {
+      const sample = SAMPLES.find((s) => s.id === b.dataset.id);
+      if (sample) pickSample(sample);
+    });
+  });
+
+  el.input.addEventListener("input", () => {
+    markSample(null);
+    setCount();
+    if (!el.error.hidden) clearError();
+  });
+
+  $("#ita-analyze").addEventListener("click", analyze);
+  $("#ita-load").addEventListener("click", () => {
+    pickSample(SAMPLES.find((s) => s.id === selectedSample) || SAMPLES[0]);
+  });
+  $("#ita-reset").addEventListener("click", reset);
+
+  setCount();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+
+</body>
+</html>

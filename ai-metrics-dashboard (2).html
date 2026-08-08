@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Metrics Dashboard — Game Ops</title>
+<style>
+  :root{
+    --bg:#F4F4F2;
+    --surface:#FFFFFF;
+    --ink:#191C1F;
+    --ink-2:#41474D;
+    --ink-3:#767D84;
+    --line:#E2E3E1;
+    --line-2:#EDEEEC;
+    --accent:#DE6B10;
+    --accent-soft:#FBEEE2;
+    --pos:#1C7A50;
+    --neg:#B23A2E;
+    --grid:#EBECEA;
+    --r:6px;
+    --sans:"Inter","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+    --mono:"JetBrains Mono","SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:14px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    background:var(--surface);
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:10px 20px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+  .brand-mark{
+    width:10px;height:22px;border-radius:2px;
+    background:linear-gradient(180deg,var(--accent) 0 55%,var(--ink) 55% 100%);
+  }
+  .brand-name{font-size:13px;font-weight:650;letter-spacing:-0.01em}
+  .brand-sub{font-size:11px;color:var(--ink-3);letter-spacing:0.06em;text-transform:uppercase}
+  .meta{display:flex;align-items:center;gap:14px;font-size:11.5px;color:var(--ink-3)}
+  .meta b{color:var(--ink-2);font-weight:600}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+  button{
+    font:inherit;font-size:12.5px;font-weight:550;
+    border-radius:var(--r);border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-2);
+    padding:7px 12px;cursor:pointer;
+    transition:background .12s ease,border-color .12s ease,color .12s ease;
+  }
+  button:hover{background:#FAFAF9;border-color:#D2D4D1;color:var(--ink)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  button.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+  button.primary:hover{background:#000;color:#fff}
+  button.ghost{border-color:transparent;background:transparent;color:var(--ink-3)}
+  button.ghost:hover{background:#EDEEEC;color:var(--ink-2)}
+
+  main{max-width:1240px;margin:0 auto;padding:22px 20px 56px}
+  .view[hidden]{display:none}
+
+  /* ---------- input view ---------- */
+  .intro{max-width:660px;margin:20px auto 18px}
+  .eyebrow{
+    font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--accent);font-weight:650;margin:0 0 8px
+  }
+  .intro h1{font-size:26px;line-height:1.2;letter-spacing:-0.02em;margin:0 0 8px;font-weight:660}
+  .intro p{margin:0;color:var(--ink-2);font-size:13.5px}
+
+  .panel{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    max-width:660px;margin:0 auto;
+  }
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:10px 14px;border-bottom:1px solid var(--line-2);flex-wrap:wrap;
+  }
+  .panel-title{font-size:12px;font-weight:650;letter-spacing:.02em}
+  .schema{
+    padding:10px 14px;border-bottom:1px solid var(--line-2);
+    font-family:var(--mono);font-size:11.5px;color:var(--ink-3);
+    overflow-x:auto;white-space:nowrap;
+  }
+  .schema b{color:var(--ink-2);font-weight:500}
+  textarea{
+    display:block;width:100%;border:0;resize:vertical;
+    min-height:250px;padding:14px;
+    font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--ink);
+    background:transparent;
+  }
+  textarea:focus{outline:0;box-shadow:inset 0 0 0 2px var(--accent-soft)}
+  .panel-foot{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:10px 14px;border-top:1px solid var(--line-2);
+  }
+  .panel-foot .spacer{margin-left:auto}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .seg button{border:0;border-radius:0;padding:6px 11px;font-size:12px;color:var(--ink-3)}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button[aria-pressed="true"]{background:var(--accent-soft);color:#8A4409}
+  .hint{font-size:11.5px;color:var(--ink-3)}
+  .error{
+    margin:12px auto 0;max-width:660px;
+    border:1px solid #E7C6C0;background:#FCF3F1;color:#8C2C21;
+    border-radius:var(--r);padding:10px 12px;font-size:12.5px;
+  }
+  .error[hidden]{display:none}
+
+  /* ---------- section headers ---------- */
+  .sec-head{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+  .sec-head h2{font-size:12px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;margin:0}
+  .sec-head span{font-size:11.5px;color:var(--ink-3)}
+  .sec{margin-bottom:26px}
+
+  /* ---------- KPI ---------- */
+  .kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(178px,1fr))}
+  .kpi{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:11px 12px 8px;display:flex;flex-direction:column;gap:2px;min-width:0;
+  }
+  .kpi-label{font-size:11px;color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+  .kpi-value{font-size:21px;font-weight:600;letter-spacing:-0.03em;line-height:1.25}
+  .kpi-row{display:flex;align-items:center;gap:7px;margin-top:1px}
+  .delta{font-family:var(--mono);font-size:11.5px;font-weight:500;display:inline-flex;align-items:center;gap:3px}
+  .delta.up{color:var(--pos)} .delta.down{color:var(--neg)} .delta.flat{color:var(--ink-3)}
+  .kpi-desc{font-size:11px;color:var(--ink-3)}
+  .spark{margin-top:6px;display:block;width:100%;height:26px}
+
+  /* ---------- observations ---------- */
+  .obs-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .obs-head{
+    display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    padding:9px 14px;border-bottom:1px solid var(--line-2);background:#FCFCFB;
+  }
+  .engine-tag{
+    font-family:var(--mono);font-size:10.5px;color:#8A4409;background:var(--accent-soft);
+    border-radius:3px;padding:3px 7px;letter-spacing:.02em;
+  }
+  .obs{display:flex;gap:12px;padding:15px 14px 17px;border-top:1px solid var(--line-2)}
+  .obs:first-of-type{border-top:0}
+  .obs-idx{font-family:var(--mono);font-size:11px;color:var(--ink-3);padding-top:2px;min-width:18px}
+  .obs-body{min-width:0}
+  .obs-title{font-size:13.5px;font-weight:620;letter-spacing:-0.01em;margin:0 0 3px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .tone{width:6px;height:6px;border-radius:50%;flex:none;background:var(--ink-3)}
+  .tone.positive{background:var(--pos)} .tone.watch{background:var(--accent)} .tone.neutral{background:#B9BDC0}
+  .obs-text{margin:0;font-size:13px;color:var(--ink-2)}
+  .obs-text em{color:var(--ink);font-style:normal;font-weight:600}
+  .obs-meta{display:flex;align-items:center;gap:7px;margin-bottom:2px}
+  .obs-note{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .hint.disclaim{color:#8E9399}
+  .obs-copy{
+    margin-left:auto;flex:none;
+    font-size:10.5px;font-weight:550;letter-spacing:.02em;
+    color:var(--ink-3);background:transparent;border:1px solid transparent;
+    border-radius:3px;padding:2px 6px;
+  }
+  .obs-copy:hover{background:#EFF0EE;color:var(--ink-2);border-color:transparent}
+  .obs-copy.done{color:var(--pos)}
+  .obs-cat{font-size:10px;color:var(--ink-3);border:1px solid var(--line);border-radius:3px;padding:1px 6px;letter-spacing:.01em}
+  .obs-field{margin-top:9px}
+  .obs-key{margin:0 0 2px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:650}
+  .obs-val{margin:0;font-size:13px;color:var(--ink-2);max-width:78ch}
+  .obs-val.lead{color:var(--ink);font-size:13.5px;font-weight:520;letter-spacing:-0.005em}
+
+  /* ---------- charts ---------- */
+  .charts{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+  .chart-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:11px 12px 6px;position:relative;min-width:0;
+  }
+  .chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:2px}
+  .chart-title{font-size:12px;font-weight:650;letter-spacing:.02em}
+  .chart-sub{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+  .chart-wrap{position:relative}
+  .tip{
+    position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;
+    background:var(--ink);color:#fff;border-radius:4px;padding:5px 8px;
+    font-family:var(--mono);font-size:11px;white-space:nowrap;transform:translate(-50%,-130%);z-index:5;
+  }
+  .tip.on{opacity:1}
+
+  footer{
+    max-width:1240px;margin:0 auto;padding:0 20px 34px;
+    color:var(--ink-3);font-size:11.5px;
+  }
+  .foot-main{margin:0 0 4px;max-width:86ch}
+  .foot-sub{margin:0;font-size:11px;color:#8E9399}
+  footer hr{border:0;border-top:1px solid var(--line);margin:0 0 12px}
+
+  @media (max-width:640px){
+    .topbar{padding:10px 14px}
+    main{padding:16px 14px 40px}
+    .meta{width:100%;order:3}
+    .kpi-value{font-size:19px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"></div>
+    <div>
+      <div class="brand-name">AI Metrics Dashboard</div>
+      <div class="brand-sub">Game Operations Data Explorer</div>
+    </div>
+  </div>
+  <div class="meta" id="meta" hidden>
+    <span>Range <b id="metaRange">—</b></span>
+    <span>Days <b id="metaDays">—</b></span>
+    <span>Source <b id="metaSource">—</b></span>
+  </div>
+  <div class="actions" id="topActions" hidden>
+    <button id="btnEdit" class="ghost">Edit data</button>
+    <button id="btnResetTop">Reset data</button>
+  </div>
+</header>
+
+<main>
+  <!-- ================= INPUT ================= -->
+  <section id="inputView" class="view">
+    <div class="intro">
+      <p class="eyebrow">Daily operations feed</p>
+      <h1>Turn a raw game metrics export into a quick operational read.</h1>
+      <p>Paste daily metrics data to visualize key trends, compare recent performance, and surface changes worth investigating.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">CSV input</span>
+        <div class="seg" role="group" aria-label="Sample dataset">
+          <button id="sampleA" aria-pressed="false">Sample: Event Week</button>
+          <button id="sampleB" aria-pressed="false">Sample: Stable Week</button>
+        </div>
+      </div>
+      <div class="schema">
+        Required columns &nbsp;→&nbsp; <b>date, dau, new_users, revenue, payers, sessions, avg_session_minutes</b>
+      </div>
+      <label for="csv" class="visually-hidden" style="position:absolute;left:-9999px">CSV data</label>
+      <textarea id="csv" spellcheck="false" placeholder="date,dau,new_users,revenue,payers,sessions,avg_session_minutes&#10;2026-07-12,41880,3204,11640.50,1298,100512,18.4&#10;..."></textarea>
+      <div class="panel-foot">
+        <button id="btnAnalyze" class="primary">Analyze data</button>
+        <button id="btnSample">Load sample data</button>
+        <button id="btnReset" class="ghost">Reset data</button>
+        <span class="spacer"></span>
+        <span class="hint" id="rowHint">Header row required · comma, semicolon or tab separated</span>
+      </div>
+    </div>
+    <div class="error" id="err" hidden></div>
+  </section>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section id="dashView" class="view" hidden>
+    <div class="sec">
+      <div class="sec-head">
+        <h2>Key metrics</h2>
+        <span id="cmpLabel">Last 7 days vs. prior 7 days</span>
+      </div>
+      <div class="kpis" id="kpis"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head">
+        <h2>Operational insights</h2>
+        <span>Patterns and movements surfaced from the loaded dataset</span>
+      </div>
+      <div class="obs-panel">
+        <div class="obs-head">
+          <div class="obs-note">
+            <span class="hint">Checks recent trends, unusual movements, period shifts, and cross-metric patterns.</span>
+            <span class="hint disclaim">Exploratory analysis only — insights highlight patterns to investigate, not confirmed causes.</span>
+          </div>
+          <span class="engine-tag" id="engineTag">analysis engine · local</span>
+        </div>
+        <div id="obsList"></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head">
+        <h2>Trends</h2>
+        <span>Shaded band marks the most recent 7 days</span>
+      </div>
+      <div class="charts" id="charts"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <hr>
+  <p class="foot-main">Portfolio prototype · Built to explore how lightweight automation and AI-assisted analysis can support Game Operations workflows. Data is processed locally in the browser.</p>
+  <p class="foot-sub">Insight generation currently uses a deterministic rule engine; an LLM adapter can be connected separately.</p>
+</footer>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   1. SAMPLE DATA
+   ===================================================================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+function buildSample(kind){
+  const DAYS=28, rnd=mulberry32(kind==="anomalies"?20260808:99001);
+  const end=new Date(); end.setHours(12,0,0,0); end.setDate(end.getDate()-1);
+  const rows=[];
+  for(let i=0;i<DAYS;i++){
+    const d=new Date(end); d.setDate(end.getDate()-(DAYS-1-i));
+    const dow=d.getDay(), weekend=(dow===0||dow===6);
+    const jit=()=>1+(rnd()-0.5)*0.05;
+
+    let dau, newUsers, arpu, conv, sessMin;
+    if(kind==="anomalies"){
+      dau=41000*(1+0.004*i)*(weekend?1.11:1)*jit();
+      newUsers=3050*(weekend?1.07:1)*jit();
+      if(i===9) newUsers*=2.5;              // paid campaign burst
+      if(i===10) newUsers*=2.1;
+      if(i===11) newUsers*=1.55;
+      if(i===18) newUsers*=0.22;            // sharp single-day drop
+      arpu=0.275*(1+0.006*i)*jit();
+      if(i>=21&&i<=23) arpu*=[1.62,1.44,1.21][i-21]; // limited-time offer
+      conv=0.0305*(1+0.004*i)*(1+(rnd()-0.5)*0.05);
+      sessMin=18.6*(weekend?1.06:1)-0.055*i+(rnd()-0.5)*0.5;
+      if(i>=21&&i<=23) sessMin+=0.9;
+    }else{
+      dau=38500*(1-0.0035*i)*(weekend?1.09:1)*jit();
+      newUsers=2600*(weekend?1.05:1)*jit();
+      arpu=0.262*(1+0.0015*i)*jit();
+      conv=0.0288*(1+(rnd()-0.5)*0.04);
+      sessMin=17.9*(weekend?1.05:1)-0.02*i+(rnd()-0.5)*0.4;
+    }
+    const DAU=Math.round(dau);
+    rows.push({
+      date:d.toISOString().slice(0,10),
+      dau:DAU,
+      new_users:Math.round(newUsers),
+      revenue:+(DAU*arpu).toFixed(2),
+      payers:Math.round(DAU*conv),
+      sessions:Math.round(DAU*(2.35+rnd()*0.25)),
+      avg_session_minutes:+sessMin.toFixed(1)
+    });
+  }
+  return rows;
+}
+const FIELDS=["date","dau","new_users","revenue","payers","sessions","avg_session_minutes"];
+function toCSV(rows){
+  return FIELDS.join(",")+"\n"+rows.map(r=>FIELDS.map(f=>r[f]).join(",")).join("\n");
+}
+
+/* =====================================================================
+   2. PARSING
+   ===================================================================== */
+function detectDelim(line){
+  const counts={",":(line.match(/,/g)||[]).length,";":(line.match(/;/g)||[]).length,"\t":(line.match(/\t/g)||[]).length};
+  return Object.keys(counts).reduce((a,b)=>counts[b]>counts[a]?b:a,",");
+}
+function num(v){
+  const n=parseFloat(String(v).replace(/[^0-9.\-]/g,""));
+  return Number.isFinite(n)?n:NaN;
+}
+function parseCSV(text){
+  const lines=text.trim().split(/\r?\n/).filter(l=>l.trim()!=="");
+  if(lines.length<2) throw new Error("Needs a header row plus at least one row of data.");
+  const delim=detectDelim(lines[0]);
+  const head=lines[0].split(delim).map(h=>h.trim().toLowerCase().replace(/^["']|["']$/g,""));
+  const missing=FIELDS.filter(f=>!head.includes(f));
+  if(missing.length) throw new Error("Missing column"+(missing.length>1?"s":"")+": "+missing.join(", ")+". Expected: "+FIELDS.join(", ")+".");
+  const idx={}; FIELDS.forEach(f=>idx[f]=head.indexOf(f));
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const c=lines[i].split(delim).map(s=>s.trim().replace(/^["']|["']$/g,""));
+    const row={date:c[idx.date]};
+    if(!row.date) throw new Error("Row "+(i+1)+" has no date.");
+    for(const f of FIELDS.slice(1)){
+      const n=num(c[idx[f]]);
+      if(!Number.isFinite(n)) throw new Error("Row "+(i+1)+": \""+f+"\" is not a number.");
+      row[f]=n;
+    }
+    rows.push(row);
+  }
+  rows.sort((a,b)=>{
+    const x=Date.parse(a.date), y=Date.parse(b.date);
+    return (isNaN(x)||isNaN(y))?0:x-y;
+  });
+  if(rows.length<4) throw new Error("Needs at least 4 days of data to compare periods.");
+  return rows;
+}
+
+/* =====================================================================
+   3. METRICS
+   ===================================================================== */
+const METRICS=[
+  {key:"dau",            label:"DAU",           agg:"avg",  fmt:"int",   desc:"7-day average", chart:"line"},
+  {key:"new_users",      label:"New users",     agg:"sum",  fmt:"int",   desc:"7-day total",   chart:"bar"},
+  {key:"revenue",        label:"Revenue",       agg:"sum",  fmt:"money", desc:"7-day total",   chart:"bar"},
+  {key:"payers",         label:"Payers",        agg:"avg",  fmt:"int",   desc:"7-day average", chart:"line"},
+  {key:"payer_conversion",label:"Payer conversion",agg:"ratio",num:"payers",den:"dau",fmt:"pct2",desc:"Payers ÷ DAU", insight:false},
+  {key:"arpu",           label:"ARPU",          agg:"ratio",num:"revenue",den:"dau",   fmt:"money4", desc:"Revenue ÷ DAU"},
+  {key:"arppu",          label:"ARPPU",         agg:"ratio",num:"revenue",den:"payers",fmt:"money2", desc:"Revenue ÷ payers"},
+  {key:"avg_session_minutes",label:"Avg session",agg:"wavg",weight:"sessions",fmt:"min",desc:"Session-weighted", chart:"line"}
+];
+const sum=(a)=>a.reduce((x,y)=>x+y,0);
+const avg=(a)=>a.length?sum(a)/a.length:0;
+
+function aggregate(rows,m){
+  if(!rows.length) return 0;
+  if(m.agg==="sum")  return sum(rows.map(r=>r[m.key]));
+  if(m.agg==="avg")  return avg(rows.map(r=>r[m.key]));
+  if(m.agg==="ratio"){const d=sum(rows.map(r=>r[m.den]));return d?sum(rows.map(r=>r[m.num]))/d:0;}
+  if(m.agg==="wavg"){const w=sum(rows.map(r=>r[m.weight]));return w?sum(rows.map(r=>r[m.key]*r[m.weight]))/w:avg(rows.map(r=>r[m.key]));}
+  return 0;
+}
+function dailySeries(rows,m){
+  if(m.agg==="ratio") return rows.map(r=>r[m.den]?r[m.num]/r[m.den]:0);
+  return rows.map(r=>r[m.key]);
+}
+function splitPeriods(rows){
+  const w=Math.min(7,Math.floor(rows.length/2));
+  return {current:rows.slice(-w), previous:rows.slice(-2*w,-w), window:w};
+}
+function pct(cur,prev){ return (prev===0)?null:((cur-prev)/Math.abs(prev))*100; }
+
+function computeModel(rows){
+  const {current,previous,window}=splitPeriods(rows);
+  const kpis=METRICS.map(m=>{
+    const cur=aggregate(current,m), prev=aggregate(previous,m);
+    return {metric:m,current:cur,previous:prev,change:pct(cur,prev),series:dailySeries(rows,m)};
+  });
+  const by={}; kpis.forEach(k=>by[k.metric.key]=k);
+  return {rows,current,previous,window,kpis,by};
+}
+
+/* =====================================================================
+   4. FORMATTING
+   ===================================================================== */
+const fmt={
+  int:v=>Math.round(v).toLocaleString("en-US"),
+  money:v=>"$"+Math.round(v).toLocaleString("en-US"),
+  money2:v=>"$"+v.toFixed(2),
+  money4:v=>"$"+v.toFixed(3),
+  min:v=>v.toFixed(1)+"m",
+  pct2:v=>(v*100).toFixed(2)+"%"
+};
+const f=(v,k)=>(fmt[k]||fmt.int)(v);
+function shortDate(s){
+  const d=new Date(s+"T00:00:00");
+  return isNaN(d)?s:d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+}
+function signed(p,dp){ return (p>0?"+":"")+p.toFixed(dp===undefined?1:dp)+"%"; }
+
+/* =====================================================================
+   5. INSIGHT ENGINE
+   Adapters share one contract:  (model) => Promise<Insight[]>
+   Insight = { tone:'positive'|'watch'|'neutral', title, text, weight }
+   Swap ENGINE.active to "llm" once an API route exists — the render layer
+   does not need to change.
+   ===================================================================== */
+function median(a){const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function mad(a){const m=median(a);return median(a.map(v=>Math.abs(v-m)));}
+function pearson(a,b){
+  const ma=avg(a),mb=avg(b);
+  const na=a.map(v=>v-ma),nb=b.map(v=>v-mb);
+  const d=Math.sqrt(sum(na.map(v=>v*v))*sum(nb.map(v=>v*v)));
+  return d?sum(na.map((v,i)=>v*nb[i]))/d:0;
+}
+function outlier(rows,key){
+  const vals=rows.map(r=>r[key]);
+  const med=median(vals), scale=1.4826*mad(vals)||1e-9;
+  let best=null;
+  vals.forEach((v,i)=>{
+    const z=(v-med)/scale, dev=med?((v-med)/med)*100:0;
+    if(Math.abs(z)>3.2&&Math.abs(dev)>25&&(!best||Math.abs(z)>Math.abs(best.z)))
+      best={i,z,dev,value:v,median:med,date:rows[i].date};
+  });
+  return best;
+}
+
+const METRIC_BY={}; METRICS.forEach(m=>METRIC_BY[m.key]=m);
+
+const CHECKS={
+  dau:"Review acquisition volume, login or client errors, recent releases, and the live-ops event calendar for the same dates.",
+  new_users:"Review campaign spend and pacing, channel-level installs, creative changes, and attribution or tracking integrity.",
+  revenue:"Review offer and bundle scheduling, price changes, payment provider status, and the top-SKU mix for the window.",
+  payers:"Review storefront placement, first-purchase offers, payment failure rates, and regional store availability.",
+  arpu:"Review whether revenue moved independently of active users, and check offer depth and payer mix.",
+  arppu:"Review top SKUs, high-tier bundle availability, and how concentrated spend is among the largest payers.",
+  avg_session_minutes:"Review content availability, event pacing, matchmaking or queue times, and friction late in the session loop.",
+  sessions:"Review session entry points, reconnect behaviour, and client stability."
+};
+const PERIOD_THRESH={dau:5,new_users:8,revenue:6,payers:5,arpu:5,arppu:6,avg_session_minutes:3};
+const PRIORITY={revenue:1.3,dau:1.25,payers:1.1,new_users:1.05,arppu:1,arpu:1,avg_session_minutes:0.9};
+
+function dod(values){
+  const o=[];
+  for(let i=1;i<values.length;i++){const p=values[i-1];o.push(p?((values[i]-p)/Math.abs(p))*100:0);}
+  return o;
+}
+function typicalMove(values){const d=dod(values).map(Math.abs);return d.length?median(d):0;}
+function lowerFirst(s){return /^[A-Z]{2,}/.test(s)?s:s.charAt(0).toLowerCase()+s.slice(1);} // leaves acronyms like DAU / ARPU intact
+
+const ratioTxt=r=>r>=10?"more than 10×":r.toFixed(1)+"×";
+
+/* Selection rules, in order of strictness:
+   - never two observations about the same metric on the same date (event key)
+   - one observation per metric per analysis pass
+   - at most two observations per metric, and two per pass unless the panel
+     would otherwise fall short
+   - the strongest period comparison always holds a slot when one qualifies,
+     since that is the comparison the dashboard header promises */
+function selectInsights(cands,limit){
+  const byWeight=(a,b)=>b.weight-a.weight;
+  const periods=cands.filter(c=>c.cat.indexOf("vs prior")>-1).sort(byWeight);
+  const ordered=[...cands].sort(byWeight);
+  if(periods.length){
+    const top=periods[0];
+    ordered.splice(ordered.indexOf(top),1);
+    ordered.unshift(top);
+  }
+  const out=[],pair=new Set(),events=new Set(),perMetric={},perCat={};
+  const run=(catCap)=>{
+    for(const c of ordered){
+      if(out.length>=limit) break;
+      if(out.indexOf(c)>-1) continue;
+      if(c.event&&events.has(c.event)) continue;
+      if(pair.has(c.metricKey+"|"+c.cat)) continue;
+      if((perMetric[c.metricKey]||0)>=2) continue;
+      if((perCat[c.cat]||0)>=catCap) continue;
+      if(c.event) events.add(c.event);
+      pair.add(c.metricKey+"|"+c.cat);
+      perMetric[c.metricKey]=(perMetric[c.metricKey]||0)+1;
+      perCat[c.cat]=(perCat[c.cat]||0)+1;
+      out.push(c);
+    }
+  };
+  run(2);
+  if(out.length<limit) run(3);
+  return out;
+}
+
+function ruleBasedInsights(model){
+  const {rows,by,window}=model;
+  const dates=rows.map(r=>r.date);
+  const cands=[];
+  const add=c=>cands.push(c);
+
+  /* ---------- Pass 1 · latest 7 days vs previous 7 days ---------- */
+  METRICS.forEach(m=>{
+    if(m.insight===false) return;
+    const k=by[m.key];
+    if(k.change===null||!isFinite(k.change)) return;
+    const abs=Math.abs(k.change);
+    if(abs<(PERIOD_THRESH[m.key]||5)) return;
+    const typ=typicalMove(k.series);
+    const ratio=typ?abs/typ:0;
+    const up=k.change>0;
+    add({
+      cat:`${window}d vs prior ${window}d`, metricKey:m.key, tone:up?"positive":"watch",
+      obs:`${m.label} ${up?"increased":"declined"} ${signed(k.change)} against the previous ${window}-day period — ${f(k.current,m.fmt)} versus ${f(k.previous,m.fmt)}.`,
+      why: ratio>=1.6
+        ? `The shift is ${ratioTxt(ratio)} the typical day-to-day movement of ${typ.toFixed(1)}% in this range, so it is larger than normal fluctuation.`
+        : `The size is close to the normal daily fluctuation of ${typ.toFixed(1)}%, but it holds across the whole ${window}-day period rather than a single day.`,
+      check:CHECKS[m.key],
+      weight:abs*(PRIORITY[m.key]||1)+(ratio>=1.6?14:4)
+    });
+  });
+
+  /* ---------- Pass 2a · largest day-over-day movement ---------- */
+  ["dau","new_users","revenue","payers","avg_session_minutes"].forEach(key=>{
+    const m=METRIC_BY[key], vals=rows.map(r=>r[key]), d=dod(vals);
+    if(d.length<2) return;
+    let bi=0; d.forEach((v,i)=>{ if(Math.abs(v)>Math.abs(d[bi])) bi=i; });
+    const v=d[bi];
+    if(Math.abs(v)<12) return;
+    const typ=median(d.map(Math.abs))||0.1;
+    add({
+      cat:"day-over-day", metricKey:key, event:key+"@"+dates[bi+1], tone:v>0?"neutral":"watch",
+      obs:`The sharpest single-day move was ${lowerFirst(m.label)} on ${shortDate(dates[bi+1])}: ${signed(v)} against the day before (${f(vals[bi],m.fmt)} → ${f(vals[bi+1],m.fmt)}).`,
+      why:`Median day-over-day movement for ${lowerFirst(m.label)} in this range is ${typ.toFixed(1)}%, so this day runs ${ratioTxt(Math.abs(v)/typ)} the norm and pulls the period average with it.`,
+      check:CHECKS[key],
+      weight:Math.min(Math.abs(v),90)*0.7
+    });
+  });
+
+  /* ---------- Pass 2b · consecutive same-direction days ---------- */
+  ["dau","revenue","payers","new_users"].forEach(key=>{
+    const m=METRIC_BY[key], vals=rows.map(r=>r[key]), d=dod(vals);
+    if(d.length<4) return;
+    const sign=Math.sign(d[d.length-1]);
+    if(!sign) return;
+    let n=0;
+    for(let i=d.length-1;i>=0&&Math.sign(d[i])===sign;i--) n++;
+    if(n<4) return;
+    const from=vals[vals.length-1-n], to=vals[vals.length-1];
+    const total=((to-from)/Math.abs(from))*100;
+    add({
+      cat:"consecutive days", metricKey:key, tone:sign>0?"positive":"watch",
+      obs:`${m.label} moved in the same direction for ${n} consecutive days, ${signed(total)} in total (${f(from,m.fmt)} → ${f(to,m.fmt)}).`,
+      why:`A run of ${n} consecutive days may indicate a directional pattern rather than normal daily fluctuation. The run is still open at the end of the range, so it could continue into the next period.`,
+      check:CHECKS[key],
+      weight:n*4.5+Math.abs(total)*0.5
+    });
+  });
+
+  /* ---------- Pass 3 · highest and lowest values in range ---------- */
+  const found=[];
+  ["dau","revenue","new_users","payers"].forEach(key=>{
+    const m=METRIC_BY[key], vals=rows.map(r=>r[key]), med=median(vals);
+    let hi=0,lo=0;
+    vals.forEach((v,i)=>{ if(v>vals[hi]) hi=i; if(v<vals[lo]) lo=i; });
+    const recent=vals.length-window;
+    const hiRecent=hi>=recent, loRecent=lo>=recent;
+    if(!hiRecent&&!loRecent) return;
+    const hiDev=med?(vals[hi]-med)/med*100:0, loDev=med?(vals[lo]-med)/med*100:0;
+    const isLow=loRecent&&(!hiRecent||Math.abs(loDev)>Math.abs(hiDev));
+    const i=isLow?lo:hi;
+    found.push({key,m,i,isLow,value:vals[i],med,dev:isLow?loDev:hiDev,date:dates[i]});
+  });
+  /* several metrics bottoming or peaking on one date is one finding, not four */
+  const groups={};
+  found.forEach(x=>{ const g=x.date+"|"+x.isLow; (groups[g]=groups[g]||[]).push(x); });
+  Object.keys(groups).forEach(g=>{
+    const set=groups[g], first=set[0];
+    if(set.length>1){
+      const names=set.map(x=>x.m.label);
+      const list=names.slice(0,-1).join(", ")+" and "+names[names.length-1];
+      add({
+        cat:"range high / low", metricKey:"multi", event:"extremes@"+first.date+first.isLow, tone:first.isLow?"watch":"positive",
+        obs:`${list} all set their ${rows.length}-day ${first.isLow?"low":"high"} on the same date, ${shortDate(first.date)} — ${set.map(x=>f(x.value,x.m.fmt)).join(" / ")} against range medians of ${set.map(x=>f(x.med,x.m.fmt)).join(" / ")}.`,
+        why:`${set.length} core metrics reaching an extreme on the same date may indicate one shared cause rather than ${set.length} separate ones, and because the date falls inside the current period it affects every comparison above.`,
+        check:`Start with whether that date is complete and correct in reporting. If it is, ${lowerFirst(CHECKS[first.key])}`,
+        weight:Math.abs(first.dev)*0.6+10+set.length*4
+      });
+    }else{
+      const x=first;
+      add({
+        cat:"range high / low", metricKey:x.key, event:x.key+"@"+x.date, tone:x.isLow?"watch":"positive",
+        obs:`${x.m.label} — ${x.isLow?"lowest":"highest"} value of the ${rows.length}-day range fell inside the current period: ${f(x.value,x.m.fmt)} on ${shortDate(x.date)}, against a range median of ${f(x.med,x.m.fmt)}.`,
+        why:`The value sits ${signed(x.dev)} from the median and falls in the last ${window} days, so it forms part of the level every other comparison here is read against.`,
+        check:CHECKS[x.key],
+        weight:Math.abs(x.dev)*0.6+8
+      });
+    }
+  });
+
+  /* ---------- Pass 4 · unusual movement above 20% ---------- */
+  const big=[];
+  ["dau","new_users","revenue","payers","avg_session_minutes"].forEach(key=>{
+    const vals=rows.map(r=>r[key]);
+    dod(vals).forEach((v,i)=>{ if(Math.abs(v)>20) big.push({key,i:i+1,v,from:vals[i],to:vals[i+1]}); });
+  });
+  if(big.length){
+    big.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+    const t=big[0], m=METRIC_BY[t.key];
+    const rest=big.slice(1,4).map(b=>`${lowerFirst(METRIC_BY[b.key].label)} ${signed(b.v)} on ${shortDate(dates[b.i])}`);
+    add({
+      cat:">20% move", metricKey:t.key, event:t.key+"@"+dates[t.i], tone:t.v>0?"neutral":"watch",
+      obs:`${big.length} day-over-day movement${big.length>1?"s":""} above 20% ${big.length>1?"were":"was"} found. Largest: ${lowerFirst(m.label)} ${signed(t.v)} on ${shortDate(dates[t.i])} (${f(t.from,m.fmt)} → ${f(t.to,m.fmt)})${rest.length?`. Also ${rest.join(", ")}`:""}.`,
+      why:`Moves of this size within a single day could be related to a campaign start or stop, an event boundary, a release, or a break in data collection. Whatever the cause, each one shifts both the period average and the baseline it is compared against.`,
+      check:`Confirm the day is real before acting on it: cross-check the raw event pipeline and reporting for ${shortDate(dates[t.i])}, then ${lowerFirst(CHECKS[t.key])}`,
+      weight:Math.min(Math.abs(t.v),100)*0.8+12
+    });
+  }
+
+  /* ---------- Cross-metric relationships ---------- */
+  const rc=by.revenue.change, dc=by.dau.change;
+  if(rc!==null&&dc!==null&&Math.abs(rc)>=8&&Math.abs(dc)<5){
+    add({
+      cat:"cross-metric", metricKey:"arpu", tone:rc>0?"positive":"watch",
+      obs:`Revenue moved ${signed(rc)} while DAU moved only ${signed(dc)}; ARPU changed ${signed(by.arpu.change)} over the same ${window} days.`,
+      why:`Revenue and audience size moved independently over the same window, which may indicate that monetization behaviour is contributing more to the change than audience size.`,
+      check:`Review offer and event scheduling inside the window, any price or bundle change, and whether a small payer segment accounts for most of the difference.`,
+      weight:Math.abs(rc)+14
+    });
+  }
+  const convCur=by.payer_conversion.current, convPrev=by.payer_conversion.previous;
+  const cc=by.payer_conversion.change;
+  if(cc!==null&&Math.abs(cc)>=4){
+    add({
+      cat:"cross-metric", metricKey:"payer_conversion", tone:cc>0?"positive":"watch",
+      obs:`Payer conversion moved ${signed(cc)}, from ${f(convPrev,"pct2")} to ${f(convCur,"pct2")} of active users.`,
+      why:`Payers moved ${signed(by.payers.change)} and DAU moved ${signed(by.dau.change)}; because the ratio tracks both together, a move in conversion may indicate a change in payer behaviour rather than in audience size alone.`,
+      check:`Review first-purchase offers, storefront placement, payment failure rates, and the new-versus-returning player mix inside the period.`,
+      weight:Math.abs(cc)*1.4+8
+    });
+  }
+
+  /* ---------- Selection, with calculated fallbacks ---------- */
+  const out=selectInsights(cands,5);
+  if(out.length<3){
+    const vals=rows.map(r=>r.dau);
+    let hi=0,lo=0; vals.forEach((v,i)=>{ if(v>vals[hi]) hi=i; if(v<vals[lo]) lo=i; });
+    const spread=vals[lo]?((vals[hi]-vals[lo])/vals[lo])*100:0;
+    out.push(spread<0.5?{
+      cat:"range summary", metricKey:"dau", tone:"neutral",
+      obs:`No metric crossed its movement threshold between periods, and DAU held within ${spread.toFixed(1)}% across all ${rows.length} days (${f(vals[lo],"int")}–${f(vals[hi],"int")}).`,
+      why:`A range this tight is unusual for live player data. It is worth ruling out a static export or a stalled reporting job before reading it as genuine stability.`,
+      check:`Confirm the feed is updating: compare a sample date against the source dashboard, and check the export job's last successful run.`,
+      weight:0
+    }:{
+      cat:"range summary", metricKey:"dau", tone:"neutral",
+      obs:`No metric crossed its movement threshold between periods. DAU ranged from ${f(vals[lo],"int")} on ${shortDate(dates[lo])} to ${f(vals[hi],"int")} on ${shortDate(dates[hi])}, a spread of ${spread.toFixed(1)}%.`,
+      why:`A spread this size across ${rows.length} days may reflect weekday and weekend cycling rather than a directional change.`,
+      check:`No action indicated. Re-run after the next full week, or widen the range if a slow trend is expected.`,
+      weight:0
+    });
+  }
+  if(out.length<3){
+    out.push({
+      cat:"range summary", metricKey:"revenue", tone:"neutral",
+      obs:`Baseline for the last ${window} days: ${f(by.revenue.current,"money")} revenue, ${f(by.dau.current,"int")} average DAU, ARPU ${f(by.arpu.current,"money4")}, payer conversion ${f(convCur,"pct2")}, sessions averaging ${f(by.avg_session_minutes.current,"min")}.`,
+      why:`These are the reference values the next period will be measured against, and the current level of each is what makes a future move readable as unusual.`,
+      check:`Record or export these figures so the next comparison starts from a fixed baseline.`,
+      weight:0
+    });
+  }
+  if(out.length<3){
+    const vol=["dau","revenue","new_users","payers"].map(k=>`${lowerFirst(METRIC_BY[k].label)} ${typicalMove(rows.map(r=>r[k])).toFixed(1)}%`);
+    out.push({
+      cat:"range summary", metricKey:"multi", tone:"neutral",
+      obs:`Typical day-to-day movement across the range: ${vol.join(", ")}.`,
+      why:`Nothing in this range exceeded its threshold, so these figures define what normal looks like here — the reference point for judging whether a future move is real.`,
+      check:`Use these as starting alert thresholds; a day beyond roughly three times the figure for its metric is worth a look.`,
+      weight:0
+    });
+  }
+  return out.slice(0,5);
+}
+
+/* LLM adapter — same contract, disabled until an endpoint is configured.
+   async function llmInsights(model){
+     const res = await fetch("/api/insights", {                // your route
+       method:"POST", headers:{"Content-Type":"application/json"},
+       body: JSON.stringify({ rows: model.rows, kpis: model.kpis.map(k=>({
+         key:k.metric.key, current:k.current, previous:k.previous, change:k.change })) })
+     });
+     const data = await res.json();
+     return data.insights;   // [{tone,title,text,weight}]
+   }                                                                        */
+const ENGINE={
+  active:"local",
+  adapters:{ local:async model=>ruleBasedInsights(model) },
+  label:{ local:"analysis engine · local" },
+  run(model){ return this.adapters[this.active](model); }
+};
+
+/* =====================================================================
+   6. CHART RENDERING (dependency-free SVG)
+   ===================================================================== */
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs){const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);return n;}
+
+function drawChart(host,cfg){
+  const wrap=host.querySelector(".chart-wrap");
+  const W=Math.max(wrap.clientWidth||320,240), H=168;
+  const pad={t:10,r:8,b:20,l:44};
+  const iw=W-pad.l-pad.r, ih=H-pad.t-pad.b;
+  const vals=cfg.values, n=vals.length;
+  let max=Math.max(...vals), min=Math.min(...vals);
+  if(cfg.type==="bar") min=Math.min(0,min);
+  else min=min-(max-min)*0.35;
+  if(max===min){max=max||1;min=max*0.9;}
+  const x=i=>pad.l+(n===1?iw/2:(i/(n-1))*iw);
+  const y=v=>pad.t+ih-((v-min)/(max-min))*ih;
+
+  const svg=el("svg",{viewBox:`0 0 ${W} ${H}`,width:W,height:H,role:"img","aria-label":cfg.title+" trend"});
+  svg.style.display="block";
+
+  // recent-period band
+  if(cfg.window>1&&n>cfg.window){
+    const bx=cfg.type==="bar"?x(n-cfg.window)-(iw/n)*0.5:x(n-cfg.window);
+    svg.appendChild(el("rect",{x:bx,y:pad.t,width:W-pad.r-bx,height:ih,fill:"#F6F4F1"}));
+  }
+  // gridlines + y labels
+  [0,0.5,1].forEach(t=>{
+    const v=min+(max-min)*t, yy=y(v);
+    svg.appendChild(el("line",{x1:pad.l,x2:W-pad.r,y1:yy,y2:yy,stroke:"var(--grid)","stroke-width":1}));
+    const lab=el("text",{x:pad.l-6,y:yy+3.5,"text-anchor":"end","font-size":9.5,fill:"#767D84","font-family":"var(--mono)"});
+    lab.textContent=cfg.axis(v);
+    svg.appendChild(lab);
+  });
+  // series
+  if(cfg.type==="bar"){
+    const bw=Math.max(2,(iw/n)*0.62);
+    vals.forEach((v,i)=>svg.appendChild(el("rect",{
+      x:x(i)-bw/2,y:Math.min(y(v),y(min)),width:bw,height:Math.max(1,Math.abs(y(min)-y(v))),
+      fill:i>=n-cfg.window?"#3D444B":"#C6CACD",rx:1
+    })));
+  }else{
+    const d=vals.map((v,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1)).join(" ");
+    svg.appendChild(el("path",{d:d+` L ${x(n-1).toFixed(1)} ${pad.t+ih} L ${x(0).toFixed(1)} ${pad.t+ih} Z`,fill:"#F2F3F1"}));
+    svg.appendChild(el("path",{d,fill:"none",stroke:"#2B3138","stroke-width":1.6,"stroke-linejoin":"round","stroke-linecap":"round"}));
+  }
+  svg.appendChild(el("circle",{cx:x(n-1),cy:y(vals[n-1]),r:3,fill:"var(--accent)"}));
+  // x labels
+  [0,Math.floor((n-1)/2),n-1].forEach((i,k)=>{
+    const t=el("text",{x:x(i),y:H-6,"text-anchor":k===0?"start":k===2?"end":"middle","font-size":9.5,fill:"#767D84","font-family":"var(--mono)"});
+    t.textContent=shortDate(cfg.labels[i]); svg.appendChild(t);
+  });
+  // hover
+  const cursor=el("line",{x1:0,x2:0,y1:pad.t,y2:pad.t+ih,stroke:"var(--accent)","stroke-width":1,opacity:0});
+  const dot=el("circle",{r:3.5,fill:"var(--accent)",stroke:"#fff","stroke-width":1.5,opacity:0});
+  svg.appendChild(cursor); svg.appendChild(dot);
+  const tip=host.querySelector(".tip");
+  svg.addEventListener("mousemove",e=>{
+    const rect=svg.getBoundingClientRect();
+    const px=(e.clientX-rect.left)*(W/rect.width);
+    let i=Math.round(((px-pad.l)/(iw||1))*(n-1)); i=Math.max(0,Math.min(n-1,i));
+    cursor.setAttribute("x1",x(i)); cursor.setAttribute("x2",x(i)); cursor.setAttribute("opacity",1);
+    dot.setAttribute("cx",x(i)); dot.setAttribute("cy",y(vals[i])); dot.setAttribute("opacity",1);
+    tip.textContent=shortDate(cfg.labels[i])+"  "+cfg.value(vals[i]);
+    tip.style.left=(x(i)/W*rect.width)+"px";
+    tip.style.top=(y(vals[i])/H*rect.height)+"px";
+    tip.classList.add("on");
+  });
+  svg.addEventListener("mouseleave",()=>{
+    cursor.setAttribute("opacity",0); dot.setAttribute("opacity",0); tip.classList.remove("on");
+  });
+
+  wrap.querySelectorAll("svg").forEach(s=>s.remove());
+  wrap.insertBefore(svg,wrap.firstChild);
+}
+
+function sparkline(values){
+  const W=140,H=26,p=3;
+  const max=Math.max(...values),min=Math.min(...values),rng=(max-min)||1;
+  const x=i=>p+(i/(values.length-1||1))*(W-2*p);
+  const y=v=>H-p-((v-min)/rng)*(H-2*p);
+  const svg=el("svg",{viewBox:`0 0 ${W} ${H}`,preserveAspectRatio:"none",class:"spark","aria-hidden":"true"});
+  svg.appendChild(el("path",{d:values.map((v,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1)).join(" "),fill:"none",stroke:"#B9BDC0","stroke-width":1.3,"vector-effect":"non-scaling-stroke"}));
+  svg.appendChild(el("circle",{cx:x(values.length-1),cy:y(values[values.length-1]),r:2,fill:"var(--accent)"}));
+  return svg;
+}
+
+/* =====================================================================
+   7. VIEW
+   ===================================================================== */
+const $=id=>document.getElementById(id);
+let MODEL=null, SOURCE="pasted";
+
+function renderKPIs(model){
+  const host=$("kpis"); host.innerHTML="";
+  model.kpis.forEach(k=>{
+    const card=document.createElement("div"); card.className="kpi";
+    const dir=k.change===null?"flat":k.change>0.05?"up":k.change<-0.05?"down":"flat";
+    const arrow=dir==="up"?"▲":dir==="down"?"▼":"–";
+    card.innerHTML=
+      `<span class="kpi-label">${k.metric.label}</span>`+
+      `<span class="kpi-value num">${f(k.current,k.metric.fmt)}</span>`+
+      `<span class="kpi-row"><span class="delta ${dir}">${arrow} ${k.change===null?"n/a":signed(k.change)}</span>`+
+      `<span class="kpi-desc">${k.metric.desc}</span></span>`;
+    card.appendChild(sparkline(k.series));
+    host.appendChild(card);
+  });
+}
+
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function insightToText(o){
+  return "Observation:\n"+o.obs+"\n\nWhy it matters:\n"+o.why+"\n\nSuggested check:\n"+o.check;
+}
+/* Clipboard API where available, hidden-textarea fallback where it is not
+   (older browsers, or any non-secure context). */
+async function copyText(text){
+  try{
+    if(navigator.clipboard&&window.isSecureContext){ await navigator.clipboard.writeText(text); return true; }
+  }catch(e){}
+  try{
+    const ta=document.createElement("textarea");
+    ta.value=text; ta.setAttribute("readonly","");
+    ta.style.cssText="position:fixed;top:-1000px;opacity:0";
+    document.body.appendChild(ta); ta.select();
+    const ok=document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){ return false; }
+}
+
+function renderObservations(list){
+  const host=$("obsList"); host.innerHTML="";
+  list.forEach((o,i)=>{
+    const d=document.createElement("article"); d.className="obs";
+    d.innerHTML=
+      `<span class="obs-idx num">${String(i+1).padStart(2,"0")}</span>`+
+      `<div class="obs-body">`+
+        `<div class="obs-meta"><span class="tone ${o.tone}"></span><span class="obs-cat num">${esc(o.cat)}</span>`+
+          `<button type="button" class="obs-copy">Copy insight</button></div>`+
+        `<div class="obs-field"><p class="obs-key">Observation</p><p class="obs-val lead">${esc(o.obs)}</p></div>`+
+        `<div class="obs-field"><p class="obs-key">Why it matters</p><p class="obs-val">${esc(o.why)}</p></div>`+
+        `<div class="obs-field"><p class="obs-key">Suggested check</p><p class="obs-val">${esc(o.check)}</p></div>`+
+      `</div>`;
+    const btn=d.querySelector(".obs-copy");
+    btn.addEventListener("click",async()=>{
+      if(btn.dataset.busy) return;
+      const ok=await copyText(insightToText(o));
+      btn.dataset.busy="1";
+      btn.textContent=ok?"Copied":"Copy failed";
+      btn.classList.toggle("done",ok);
+      setTimeout(()=>{ btn.textContent="Copy insight"; btn.classList.remove("done"); delete btn.dataset.busy; },1500);
+    });
+    host.appendChild(d);
+  });
+}
+
+let CHARTS=[];
+function renderCharts(model){
+  const host=$("charts"); host.innerHTML=""; CHARTS=[];
+  const labels=model.rows.map(r=>r.date);
+  METRICS.filter(m=>m.chart).forEach(m=>{
+    const k=model.by[m.key];
+    const card=document.createElement("div"); card.className="chart-card";
+    const dir=k.change===null?"flat":k.change>0?"up":"down";
+    card.innerHTML=
+      `<div class="chart-head"><span class="chart-title">${m.label}</span>`+
+      `<span class="chart-sub delta ${dir}">${k.change===null?"":signed(k.change)}</span></div>`+
+      `<div class="chart-wrap"><div class="tip num"></div></div>`;
+    host.appendChild(card);
+    const cfg={
+      title:m.label,type:m.chart,values:k.series,labels,window:model.window,
+      axis:v=>m.fmt==="money"?"$"+Math.round(v/1000)+"k":m.fmt==="min"?v.toFixed(0)+"m":v>=1000?(v/1000).toFixed(0)+"k":Math.round(v),
+      value:v=>f(v,m.fmt)
+    };
+    CHARTS.push({card,cfg});
+    drawChart(card,cfg);
+  });
+}
+let rz; addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>CHARTS.forEach(c=>drawChart(c.card,c.cfg)),140);});
+
+function showError(msg){ const e=$("err"); e.textContent=msg; e.hidden=false; }
+function clearError(){ $("err").hidden=true; }
+
+async function analyze(){
+  clearError();
+  let rows;
+  try{ rows=parseCSV($("csv").value); }
+  catch(e){ showError(e.message); return; }
+
+  MODEL=computeModel(rows);
+  renderKPIs(MODEL);
+  renderCharts(MODEL);
+  $("engineTag").textContent=ENGINE.label[ENGINE.active];
+  renderObservations(await ENGINE.run(MODEL));
+
+  $("cmpLabel").textContent=`Last ${MODEL.window} days vs. prior ${MODEL.window} days`;
+  $("metaRange").textContent=shortDate(rows[0].date)+" – "+shortDate(rows[rows.length-1].date);
+  $("metaDays").textContent=rows.length;
+  $("metaSource").textContent=SOURCE;
+  $("meta").hidden=false; $("topActions").hidden=false;
+  $("inputView").hidden=true; $("dashView").hidden=false;
+  scrollTo({top:0,behavior:"instant"});
+}
+
+function loadSample(kind){
+  SOURCE=kind==="anomalies"?"sample · event week":"sample · stable week";
+  $("csv").value=toCSV(buildSample(kind));
+  $("sampleA").setAttribute("aria-pressed",String(kind==="anomalies"));
+  $("sampleB").setAttribute("aria-pressed",String(kind!=="anomalies"));
+  $("rowHint").textContent="28 days loaded · edit freely before analyzing";
+  clearError();
+}
+function resetAll(){
+  MODEL=null; SOURCE="pasted";
+  $("csv").value="";
+  $("sampleA").setAttribute("aria-pressed","false");
+  $("sampleB").setAttribute("aria-pressed","false");
+  $("rowHint").textContent="Header row required · comma, semicolon or tab separated";
+  $("meta").hidden=true; $("topActions").hidden=true;
+  $("dashView").hidden=true; $("inputView").hidden=false;
+  clearError(); $("csv").focus();
+}
+
+$("btnAnalyze").addEventListener("click",()=>{ if(!$("csv").value.trim()){showError("Paste CSV data or load a sample set first.");return;} analyze(); });
+$("btnSample").addEventListener("click",()=>loadSample("anomalies"));
+$("sampleA").addEventListener("click",()=>loadSample("anomalies"));
+$("sampleB").addEventListener("click",()=>loadSample("steady"));
+$("btnReset").addEventListener("click",resetAll);
+$("btnResetTop").addEventListener("click",resetAll);
+$("btnEdit").addEventListener("click",()=>{ $("dashView").hidden=true; $("inputView").hidden=false; $("topActions").hidden=true; $("meta").hidden=true; });
+$("csv").addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") analyze(); });
+
+loadSample("anomalies");
+</script>
+</body>
+</html>
